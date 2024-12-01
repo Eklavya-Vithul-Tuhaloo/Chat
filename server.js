@@ -264,25 +264,38 @@ app.get("/chat/:friend", async (req, res) => {
     return res.status(401).json({ success: false, message: "Unauthorized access." });
   }
 
-  console.log(`Fetching messages sent by ${username} in chat room with ${friend}`);
+  console.log(`Fetching messages between ${username} and ${friend}`);
 
   try {
-   const room = `-${friend}`;
-    console.log("Room:", room);
-    console.log("From:", username);
-    // Fetch messages sent by the current user, sorted by message content
+    // First check: messages in `-username` with `friend`
+    const firstRoom = `-${username}`;
+    const secondRoom = `-${friend}`;
+
+    console.log(`Checking messages in rooms: ${firstRoom} and ${secondRoom}`);
+
+    // Fetch messages where `room` is `-username` or `-friend` and either user sent the message
     const messages = await db.collection("messages")
-      .find({ room, from: username }) // Filter for messages sent by the current user
-      .sort({ message: 1 }) // Sort messages alphabetically by the message field
-      .project({ _id: 0, from: 1, message: 1, timestamp: 1 }) // Include only desired fields
+      .find({
+        $or: [
+          { room: firstRoom, from: username },
+          { room: firstRoom, from: friend },
+          { room: secondRoom, from: username },
+          { room: secondRoom, from: friend }
+        ]
+      })
+      .sort({ timestamp: 1 }) // Sort messages by time (oldest to newest)
+      .project({ _id: 0, from: 1, message: 1, timestamp: 1 }) // Include only relevant fields
       .toArray();
-      console.log(messages);
+
+    console.log("Messages:", messages);
     res.json({ success: true, messages });
   } catch (err) {
     console.error("Error fetching messages:", err);
     res.status(500).json({ success: false, message: "Failed to fetch messages." });
   }
 });
+
+
 
 // Save a message to the database
 app.post("/save-message", authenticate, async (req, res) => {
